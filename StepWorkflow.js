@@ -1,7 +1,9 @@
+const EventEmitter = require('events');
+
 /**
  * StepWorkflow
  */
-class StepWorkflow {
+class StepWorkflow extends EventEmitter {
   #steps = new Map();
   #stepNames = new Map();
   #rollbacks = new Map();
@@ -15,6 +17,7 @@ class StepWorkflow {
    * @param {object} [globalData] data that assign to instance
    */
   constructor(globalData = {}) {
+    super();
     Object.assign(this, globalData);
   }
   /**
@@ -91,13 +94,12 @@ class StepWorkflow {
       this.stepName = this.#stepNames.get(key);
       if (this.#rollbacks.has(key)) {
         try {
+          this.emit('rollback', this.stepName, data, this);
           await this.#rollbacks.get(key).call(this, error, data);
         } catch (err) {
           const _error = Object.assign(err, { stepName: this.stepName, data });
           if (this.#errors.has(key)) {
-            return await this.#errors.get(key).call(this, _error);
-          } else {
-            return _error;
+            await this.#errors.get(key).call(this, _error);
           }
         }
       }
@@ -122,6 +124,7 @@ class StepWorkflow {
         }
         const currentData = JSON.parse(JSON.stringify(data || null));
         try {
+          this.emit('step', this.stepName, data, this);
           data = await step.call(this, data);
           this.#run.unshift({ key, data: currentData });
         } catch (error) {
@@ -137,6 +140,7 @@ class StepWorkflow {
       }
       if (this.#final) {
         this.stepName = this.#final.name || 'final';
+        this.emit('step', this.stepName, data, this);
         return await this.#final.call(this, data);
       }
       this.#run = [];
@@ -145,6 +149,7 @@ class StepWorkflow {
       if (this.#catch) {
         return await this.#catch(error);
       } else {
+        this.emit('error', error, this);
         throw error;
       }
     }
