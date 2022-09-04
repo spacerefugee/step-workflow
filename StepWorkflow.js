@@ -1,5 +1,4 @@
 const EventEmitter = require('events');
-
 /**
  * StepWorkflow
  */
@@ -108,12 +107,13 @@ class StepWorkflow extends EventEmitter {
   }
   /**
    * run the workflow step by step
-   * @param {string} [stepName] step name - workflow will start with this step, pass `null` for starting with first step
    * @param {*} [initData] data that pass to this step
+   * @param {string} [stepName] step name - workflow will start with this step, pass `null` for starting with first step
    * @param {boolean} oneStep only run this step, default is `false`, all the steps behind will run
    * @returns {Promise}
    */
-  async run(stepName, initData, oneStep = false) {
+  async run(initData, stepName, oneStep = false) {
+    this.emit('start', initData, this);
     try {
       let data = initData;
       for (const [key, step] of this.#steps) {
@@ -124,11 +124,12 @@ class StepWorkflow extends EventEmitter {
         }
         const currentData = JSON.parse(JSON.stringify(data || null));
         try {
-          this.emit('step', this.stepName, data, this);
+          this.emit('step', data, this);
           data = await step.call(this, data);
           this.#run.unshift({ key, data: currentData });
         } catch (error) {
           this.#run.unshift({ key, data: currentData });
+          this.emit('error', error, this);
           await this.#rollback(error);
           const _error = Object.assign(error, { stepName: this.#stepNames.get(key), data: currentData });
           if (this.#errors.has(key)) {
@@ -140,10 +141,11 @@ class StepWorkflow extends EventEmitter {
       }
       if (this.#final) {
         this.stepName = this.#final.name || 'final';
-        this.emit('step', this.stepName, data, this);
+        this.emit('step', data, this);
         return await this.#final.call(this, data);
       }
       this.#run = [];
+      this.emit('done', data, this);
       return data;
     } catch (error) {
       if (this.#catch) {

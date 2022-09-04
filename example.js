@@ -55,13 +55,13 @@ function asyncRollback(err) {
   });
   workflow.step(step1).step(step2).step(step3).final(finalStep);
   // run方法接收三个参数
-  // stepName: 从那个step开始执行，null或者不传默认就从第一个step开始执行
   // data: 执行step传入的参数
+  // stepName: 从那个step开始执行，null或者不传默认就从第一个step开始执行
   // oneStep: 只执行一个step 默认false
-  const result = await workflow.run(null, 100);
+  const result = await workflow.run(100);
   console.log(result);
   // 从step2开始
-  const result2 = await workflow.run('step2', 100);
+  const result2 = await workflow.run(100, 'step2');
   console.log(result2);
 
   // 直接调用
@@ -81,7 +81,7 @@ function asyncRollback(err) {
     .rollback(rollback) // 此回滚方法不会被执行，因为是上一个步骤抛出的异常
     // catch 捕获所有异常
     .catch((error) => console.log('catch handler', error))
-    .run(null, 100);
+    .run(100);
 
   await StepWorkflow()
     .step(asyncStep) // setp支持async
@@ -94,5 +94,5 @@ function asyncRollback(err) {
     .step(step3)
     // 上面的error已经处理了错误，所以这个catch不会执行
     .catch((error) => console.log('catch handler', error))
-    .run(null, 100);
+    .run(100);
 })();
