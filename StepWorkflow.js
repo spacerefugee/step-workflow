@@ -91,13 +91,12 @@ class StepWorkflow extends EventEmitter {
   }
   async #rollback(error) {
     for (const { key, data } of this.#run) {
-      this.stepName = this.#stepNames.get(key);
       if (this.#rollbacks.has(key)) {
         try {
-          this.emit('rollback', this.stepName, data, this);
-          await this.#rollbacks.get(key).call(this, error, data);
+          this.emit('rollback', data, error, this);
+          await this.#rollbacks.get(key).call(this, data, error);
         } catch (err) {
-          const _error = Object.assign(err, { stepName: this.stepName, data });
+          const _error = Object.assign(err, { rollback: true, stepName: this.#stepNames.get(key), data });
           throw _error;
         }
       }
@@ -129,29 +128,29 @@ class StepWorkflow extends EventEmitter {
           this.#run.unshift({ key, data: currentData });
         } catch (error) {
           this.#run.unshift({ key, data: currentData });
-          this.emit('error', error, this);
           const _error = Object.assign(error, { stepName: this.#stepNames.get(key), data: currentData });
           if (this.#errors.has(key)) {
-            return await this.#errors.get(key).call(this, _error);
+            await this.#errors.get(key).call(this, _error);
           } else {
-            await this.#rollback(error);
+            await this.#rollback(_error);
+            throw _error;
           }
         }
       }
       if (this.#final) {
         this.stepName = this.#final.name || 'final';
-        this.emit('step', data, this);
-        return await this.#final.call(this, data);
+        this.emit('final', data, this);
+        data = await this.#final.call(this, data);
       }
       this.#run = [];
       this.#done = false;
       this.emit('done', data, this);
       return data;
     } catch (error) {
+      this.emit('error', error, this);
       if (this.#catch) {
         return await this.#catch(error);
       } else {
-        this.emit('error', error, this);
         throw error;
       }
     }

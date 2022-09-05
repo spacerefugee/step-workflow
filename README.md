@@ -51,7 +51,7 @@ await StepWorkflow()
   .error((error) => {
     console.log('error handler', error);
   })
-  // step3不会执行，因为上一个步骤抛出异常
+  // step3继续执行，因为上一个步骤的异常已经被处理
   .step(step3)
   // 上面的error已经处理了错误，所以这个catch不会执行
   .catch((error) => console.log('catch handler', error))
@@ -133,7 +133,7 @@ workflow
 
 参数：
 
-- `rollbackFn[Funciton]`: 回滚函数，可以是 async 函数。函数接收一个参数，为对应[step](#step)抛出的`error`，`error`包含`stepName`步骤名称和`data`步骤的传入参数。
+- `rollbackFn[Funciton]`: 回滚函数，可以是 async 函数。函数接收两个参数，第一个参数为对应[step](#step)的传入参数，第二个为抛出的`error`，`error`包含抛出错误对应的`stepName`和`data`
 
 返回：当前[StepWorkflow](#StepWorkflow)实例
 
@@ -144,39 +144,44 @@ workflow
     console.log(data); // 1
     return 2;
   })
-  .rollback(function (error) {
+  .rollback(function (data, error) {
     console.log(error); // this is a error
-    console.log(error.stepName); // step1
-    console.log(error.data); // 1
+    console.log(error.stepName); // step3
+    console.log(error.data); // 3
+    console.log(data); // step1的参数 1
   })
   .step(function step2(data) {
     console.log(data); // 2
     return 3;
   })
-  .rollback(function (error) {
-    console.log(error); // this is a error
-    console.log(error.stepName); // step2
-    console.log(error.data); // 1
-  })
-  .step(function step3(data) {
-    console.log(data); // 2
-    throw new Error('this is a error');
-  })
-  .rollback(function (error) {
+  .rollback(function (data, error) {
     console.log(error); // this is a error
     console.log(error.stepName); // step3
-    console.log(error.data); // 2
+    console.log(error.data); // 3
+    console.log(data); // step2的参数 2
+  })
+  .step(function step3(data) {
+    console.log(data); // 3
+    throw new Error('this is a error');
+  })
+  .rollback(function (data, error) {
+    console.log(error); // this is a error
+    console.log(error.stepName); // step3
+    console.log(error.data); // 3
+    console.log(data); // 3
   })
   .run(1);
 ```
 
 #### error
 
-定义一个错误函数。定义[step](#step)后，再调用`error`，则为此步骤的错误函数。当[step](#step)抛出错误时，`error`会被调用。
+定义一个错误处理函数。定义[step](#step)后，再调用`error`，则为此步骤的错误处理函数。当[step](#step)出现异常时，`error`会被调用
 
-`error`错误函数不会往上调用，并且当`error`存在时，所有[rollback](#rollback)不会被调用。
+当`error`的[step](#step)抛出异常时，所有[rollback](#rollback)都不会被调用
 
-当`error`继续抛出错误时，错误会被[catch](#catch)捕获
+当`error`没有继续抛出异常，后续的[step](#step)会继续执行
+
+当`error`继续抛出异常时，后续的[step](#step)不会执行，并且异常会被[catch](#catch)（如果有）捕获
 
 参数：
 
@@ -288,6 +293,7 @@ workflow2.run();
 
 - start: workflow 开始时触发
 - step: 每个 step 执行时触发
+- final: final 执行时触发
 - done: 所有 step 执行完触发
 - error: 出现错误时触发
 - rollback: 回滚函数执行时触发
