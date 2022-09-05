@@ -11,6 +11,7 @@ class StepWorkflow extends EventEmitter {
   #final;
   #catch;
   #run = [];
+  #done = false;
   /**
    * create a workflow
    * @param {object} [globalData] data that assign to instance
@@ -97,9 +98,7 @@ class StepWorkflow extends EventEmitter {
           await this.#rollbacks.get(key).call(this, error, data);
         } catch (err) {
           const _error = Object.assign(err, { stepName: this.stepName, data });
-          if (this.#errors.has(key)) {
-            await this.#errors.get(key).call(this, _error);
-          }
+          throw _error;
         }
       }
     }
@@ -117,6 +116,7 @@ class StepWorkflow extends EventEmitter {
     try {
       let data = initData;
       for (const [key, step] of this.#steps) {
+        if (this.#done) break;
         this.stepName = this.#stepNames.get(key);
         if (stepName && this.stepName != stepName) {
           !oneStep && (stepName = null);
@@ -130,12 +130,11 @@ class StepWorkflow extends EventEmitter {
         } catch (error) {
           this.#run.unshift({ key, data: currentData });
           this.emit('error', error, this);
-          await this.#rollback(error);
           const _error = Object.assign(error, { stepName: this.#stepNames.get(key), data: currentData });
           if (this.#errors.has(key)) {
             return await this.#errors.get(key).call(this, _error);
           } else {
-            throw _error;
+            await this.#rollback(error);
           }
         }
       }
@@ -145,6 +144,7 @@ class StepWorkflow extends EventEmitter {
         return await this.#final.call(this, data);
       }
       this.#run = [];
+      this.#done = false;
       this.emit('done', data, this);
       return data;
     } catch (error) {
@@ -155,6 +155,9 @@ class StepWorkflow extends EventEmitter {
         throw error;
       }
     }
+  }
+  done() {
+    this.#done = true;
   }
 }
 

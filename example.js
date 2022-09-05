@@ -71,7 +71,18 @@ function asyncRollback(err) {
     .step(step2)
     .rollback(rollback) // 回滚方法会往上执行，出错步骤前所有具有rollback的方法都会被执行
     .step(errorStep) // 会抛出错误的step
-    // 错误处理，若继续抛出，则在catch捕获
+    // step3不会执行，因为上一个步骤抛出异常
+    .step(step3)
+    .rollback(rollback) // 此回滚方法不会被执行，因为是上一个步骤抛出的异常
+    .run(100);
+
+  await StepWorkflow()
+    .step(step1)
+    .rollback(rollback) // 回滚方法不会执行
+    .step(step2)
+    .rollback(rollback) // 回滚方法不会执行
+    .step(errorStep) // 会抛出错误的step
+    // 错误处理，rollback不会被执行，若继续抛出，则在catch捕获
     .error((error) => {
       console.log('error handler', error);
       throw error;
